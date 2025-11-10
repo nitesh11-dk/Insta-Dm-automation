@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>📡 Dashboard</title>
+    <style>
+      body {
+        background: #121212;
+        color: #f1f1f1;
+        font-family: "Segoe UI", sans-serif;
+        text-align: center;
+        padding: 40px;
+      }
+      h1 {
+        color: #00b3ff;
+      }
+      .info,
+      .logs {
+        background: #1e1e2f;
+        padding: 20px;
+        border-radius: 12px;
+        width: 80%;
+        margin: 20px auto;
+        text-align: left;
+      }
+      .logs {
+        height: 250px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 14px;
+        color: #b7ffb7;
+        border: 1px solid #333;
+      }
+      button {
+        background: #0078ff;
+        border: none;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        margin: 10px 0;
+      }
+      button:hover {
+        background: #005ce6;
+      }
+      button:disabled {
+        background: #444;
+        cursor: not-allowed;
+      }
+      .loading {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 3px solid #f1f1f1;
+        border-top: 3px solid #00b3ff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: middle;
+        margin-left: 10px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+
+      /* Popup 2FA Box */
+      #twofaPopup {
+        display: none;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #1e1e2f;
+        border: 1px solid #0078ff;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 0 15px rgba(0, 120, 255, 0.3);
+        width: 260px;
+        z-index: 9999;
+        animation: slideIn 0.4s ease;
+      }
+      @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      #twofaPopup h3 {
+        margin-top: 0;
+        color: #00b3ff;
+        font-size: 18px;
+        text-align: center;
+      }
+      #twofaPopup input {
+        width: 90%;
+        padding: 8px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 10px;
+        font-size: 15px;
+        text-align: center;
+      }
+      #twofaPopup button {
+        width: 100%;
+        margin-top: 10px;
+        padding: 8px;
+        background: #0078ff;
+        border-radius: 6px;
+        border: none;
+        color: white;
+        cursor: pointer;
+      }
+      #twofaPopup button:hover {
+        background: #005ce6;
+      }
+      #twofaPopup p {
+        font-size: 13px;
+        color: #b7ffb7;
+        text-align: center;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Direct Dashboard (No Login) -->
+    <div id="dashboard">
+      <h1>📡 Dashboard</h1>
+
+      <div class="info">
+        <h2>👤 User Info</h2>
+        <p><strong>Username:</strong> <span id="username">Not logged in</span></p>
+        <p><strong>Proxy:</strong> <span id="proxy">-</span></p>
+        <p><strong>Messages Remaining:</strong> <span id="messages">-</span></p>
+        <button id="refreshHealth">🔄 Refresh Info</button>
+        <span id="loadingSpinner" class="loading" style="display: none"></span>
+      </div>
+
+      <div>
+        <button id="loginWebhook">Login</button>
+        <button id="sendDM" disabled>
+          Start DM
+          <span id="dmLoading" class="loading" style="display: none"></span>
+        </button>
+        <a href="/leads"><button>📋 Manage Leads</button></a>
+      </div>
+
+      <div class="logs" id="logs"></div>
+    </div>
+
+    <!-- 🔐 2FA Popup -->
+    <div id="twofaPopup">
+      <h3>Enter 2FA Code</h3>
+      <input id="twofaCode" placeholder="Enter code" />
+      <button id="submit2faBtn">Submit</button>
+      <p id="twofaMsg"></p>
+    </div>
+
+    <script>
+      // ---------- Dashboard Logic (No Login Validation) ----------
+      const usernameEl = document.getElementById("username");
+      const proxyEl = document.getElementById("proxy");
+      const messagesEl = document.getElementById("messages");
+      const logsEl = document.getElementById("logs");
+      const refreshBtn = document.getElementById("refreshHealth");
+      const spinner = document.getElementById("loadingSpinner");
+      const loginBtn = document.getElementById("loginWebhook");
+      const dmBtn = document.getElementById("sendDM");
+      const dmLoading = document.getElementById("dmLoading");
+
+      const twofaPopup = document.getElementById("twofaPopup");
+      const twofaCode = document.getElementById("twofaCode");
+      const submit2faBtn = document.getElementById("submit2faBtn");
+      const twofaMsg = document.getElementById("twofaMsg");
+
+      let isLoggedIn = false;
+      let isDMRunning = false;
+
+      dmBtn.disabled = true;
+
+      async function updateHealth() {
+        spinner.style.display = "inline-block";
+        refreshBtn.disabled = true;
+        try {
+          const res = await fetch("/health");
+          const data = await res.json();
+          if (data.currentUser) {
+            isLoggedIn = true;
+            usernameEl.textContent = data.currentUser;
+            proxyEl.textContent = data.proxy || "None";
+            messagesEl.textContent = data.rateLimit?.messagesRemaining ?? "∞";
+            isDMRunning = data.isLoopRunning ?? false;
+            dmBtn.disabled = isDMRunning;
+            dmLoading.style.display = isDMRunning ? "inline-block" : "none";
+          } else {
+            isLoggedIn = false;
+            usernameEl.textContent = "Not logged in";
+            proxyEl.textContent = "-";
+            messagesEl.textContent = "-";
+            dmBtn.disabled = true;
+            dmLoading.style.display = "none";
+          }
+        } catch (err) {
+          console.error("Health check failed:", err);
+        } finally {
+          spinner.style.display = "none";
+          refreshBtn.disabled = false;
+        }
+      }
+
+      async function postWebhook(url, body = {}) {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          return await res.json();
+        } catch (err) {
+          console.error("Webhook call failed:", err);
+        } finally {
+          await updateHealth();
+        }
+      }
+
+      loginBtn.addEventListener("click", async () => {
+        loginBtn.disabled = true;
+        await postWebhook("/webhook-proxy-1", { username: "<%= USERNAME %>" });
+        logToUI("✅ Login webhook triggered!");
+        await updateHealth();
+        if (isLoggedIn) dmBtn.disabled = false;
+        loginBtn.disabled = false;
+      });
+
+      dmBtn.addEventListener("click", async () => {
+        if (!isLoggedIn) return alert("⚠️ Please login first!");
+        isDMRunning = true;
+        dmBtn.disabled = true;
+        dmLoading.style.display = "inline-block";
+        await postWebhook("/start-dm-loop", { username: "<%= USERNAME %>" });
+        isDMRunning = false;
+        dmLoading.style.display = "none";
+        await updateHealth();
+      });
+
+      refreshBtn.addEventListener("click", async () => {
+        await updateHealth();
+      });
+
+      // ---------- Logs Stream ----------
+      const evtSource = new EventSource("/logs");
+      evtSource.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        logToUI(msg);
+
+        if (msg.includes("2FA required") || msg.includes("2FA verification detected")) {
+          show2FAPopup();
+        }
+
+        if (msg.includes("Logged in successfully")) {
+          hide2FAPopup();
+        }
+      };
+
+      // ---------- 2FA Popup ----------
+      function show2FAPopup() {
+        twofaPopup.style.display = "block";
+        twofaCode.focus();
+        twofaMsg.textContent = "🔐 Please enter your Instagram 2FA code.";
+      }
+
+      function hide2FAPopup() {
+        twofaPopup.style.display = "none";
+        twofaMsg.textContent = "";
+        twofaCode.value = "";
+      }
+
+      submit2faBtn.addEventListener("click", submit2FA);
+      twofaCode.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") submit2FA();
+      });
+
+      async function submit2FA() {
+        const code = twofaCode.value.trim();
+        if (!code) return alert("Enter 2FA code first!");
+        const res = await fetch("/submit-2fa", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          twofaMsg.textContent = "✅ Code submitted!";
+          setTimeout(() => hide2FAPopup(), 1200);
+        } else {
+          twofaMsg.textContent = "❌ Failed to submit.";
+        }
+      }
+
+      function logToUI(msg) {
+        const div = document.createElement("div");
+        div.textContent = msg;
+        logsEl.appendChild(div);
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+
+      // Load dashboard directly
+      updateHealth();
+    </script>
+  </body>
+</html>
