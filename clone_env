@@ -1,0 +1,15 @@
+# ============================================
+# 🔧 APP CONFIGURATION
+# ============================================
+LOGIN_USERNAME=<your_login_username>
+
+# ============================================
+# 🌐 WEBHOOK URLs (from n8n)
+# ============================================
+WEBHOOK_LOGIN=http://host.docker.internal:<your_n8n_port>/webhook/<your_login_webhook_id>
+WEBHOOK_DM=http://host.docker.internal:<your_n8n_port>/webhook/<your_dm_webhook_id>
+
+# ============================================
+# 🗄️ DATABASE CONNECTION (NeonDB)
+# ============================================
+DATABASE_URL=postgresql://<db_user>:<db_password>@<db_host>/<db_name>?sslmode=require&channel_binding=require
