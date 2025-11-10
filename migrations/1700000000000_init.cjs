@@ -3,11 +3,11 @@
 exports.shorthands = undefined;
 
 exports.up = (pgm) => {
-  // Drop existing tables if they exist
+  // Drop if exists
   pgm.sql(`
-      DROP TABLE IF EXISTS leads_1;
-      DROP TABLE IF EXISTS accounts;
-    `);
+    DROP TABLE IF EXISTS leads_1;
+    DROP TABLE IF EXISTS accounts;
+  `);
 
   // Create leads_1 table
   pgm.createTable("leads_1", {
@@ -18,11 +18,13 @@ exports.up = (pgm) => {
     time_stamp: { type: "varchar(100)", default: null },
   });
 
-  // Create simplified accounts table
+  // Create accounts table
   pgm.createTable("accounts", {
     id: "id",
-    username: { type: "varchar(100)", notNull: true, unique: true },
+    username: { type: "varchar(100)", notNull: true },
     password: { type: "varchar(100)", notNull: true },
+    port: { type: "varchar(50)", notNull: true, unique: true },
+    table_name: { type: "varchar(50)", unique: true },
   });
 };
 
